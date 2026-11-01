@@ -1,28 +1,27 @@
-[README.md](https://github.com/user-attachments/files/34237577/README.md)
 # IMU-Based Dead Reckoning Navigation System
 
-A handheld unit that tracks its own X-Y position and heading using only an IMU (MPU-series accelerometer + gyroscope). No GPS, no camera, no external signal. Built for the *Aerospace Defence Electronics Basics* course as a simplified version of the inertial navigation used in GPS-denied scenarios (aircraft, missiles, submarines).
+A handheld navigation unit that estimates its own X-Y position and heading using only an IMU (MPU-series accelerometer and gyroscope). It does not rely on GPS, a camera, or any external signal. Developed for the *Aerospace Defence Electronics Basics* course, this project is a simplified demonstration of inertial navigation in GPS-denied environments, such as aircraft, missiles, and submarines.
 
-## How it works
+## How It Works
 
-1. **Calibration (5 s, board still and flat):** averages 250 samples to find the gyro offsets and the starting roll/pitch from the direction of gravity.
-2. **Orientation:** roll, pitch and yaw are updated by integrating the gyroscope.
-3. **Complementary filter:** roll and pitch are pulled 2% per step toward the tilt measured by the accelerometer (`ALPHA = 0.98`, 98% gyro / 2% accel). This is only applied when the measured acceleration is close to 1 g, so it is not fooled while the unit is accelerating.
-4. **World-frame acceleration:** body acceleration is rotated into the world frame using roll, pitch and yaw. This also cancels gravity in X and Y.
-5. **Double integration:** acceleration is integrated to velocity, and velocity to position.
-6. **Zero-velocity update (ZUPT):** if horizontal acceleration is below 0.30 m/s² **and** rotation is below 0.08 rad/s for 12 samples in a row (about 0.25 s), the unit is treated as stopped. Velocity is reset to zero and the gyro offsets are slowly re-learned. This removes most of the velocity drift that would otherwise grow without bound.
+1. **Calibration (5 seconds, board still and level):** Averages 250 samples to estimate gyro offsets and initial roll/pitch from gravity.
+2. **Orientation tracking:** Roll, pitch, and yaw are updated by integrating gyroscope readings.
+3. **Complementary filter:** Roll and pitch are corrected 2% per step toward the accelerometer's tilt estimate (`ALPHA = 0.98`, or 98% gyro / 2% accelerometer). This correction is applied only when measured acceleration is close to 1 g, helping avoid errors while the unit is accelerating.
+4. **World-frame acceleration:** Body-frame acceleration is rotated into the world frame using roll, pitch, and yaw. This also removes gravity from the X and Y components.
+5. **Double integration:** Acceleration is integrated to obtain velocity, then velocity is integrated to estimate position.
+6. **Zero-velocity update (ZUPT):** When horizontal acceleration is below 0.30 m/s² **and** rotation is below 0.08 rad/s for 12 consecutive samples (about 0.25 seconds), the unit is considered stationary. Velocity is reset to zero, and gyro offsets are gradually re-learned. This reduces the velocity drift that would otherwise keep accumulating.
 
-### Known limitation
+### Known Limitations
 
-Yaw (heading) comes from gyro integration only, so it drifts slowly over time. The magnetometer in the MPU9250 is **not** used in this version. Position error also grows with distance because of double integration. Both are expected for a low-cost IMU and are the reason real inertial navigation systems are periodically corrected by an external reference.
+Yaw (heading) is calculated using gyroscope integration alone, so it gradually drifts over time. The MPU9250 magnetometer is **not** used in this version. Position error also increases with distance because of double integration. These are expected limitations of a low-cost IMU and explain why practical inertial navigation systems are periodically corrected using an external reference.
 
 ## Hardware
 
 | Part | Notes |
 |---|---|
 | Arduino Uno (or ESP32) | |
-| MPU-series IMU module (MPU9250 board) | Read directly over I2C at address `0x68`, no library needed |
-| Jumper wires, USB cable | |
+| MPU-series IMU module (MPU9250 board) | Read directly over I2C at address `0x68`, without a library |
+| Jumper wires and USB cable | |
 
 ### Wiring
 
@@ -33,45 +32,47 @@ Yaw (heading) comes from gyro integration only, so it drifts slowly over time. T
 | SCL | A5 | GPIO22 |
 | SDA | A4 | GPIO21 |
 
-The sensor was mounted **upside-down**, so axis signs are flipped in the code (`FLIP_ABOUT_X`, `SX/SY/SZ`). If your board is mounted face-up, set the signs to `+1`.
+The sensor was mounted **upside-down**, so the code flips the axis signs (`FLIP_ABOUT_X`, `SX/SY/SZ`). If your board is mounted face-up, change the signs to `+1`.
 
-## Files
+## Project Files
 
 | File | Purpose |
 |---|---|
-| `mpureadings/mpureadings.ino` | Arduino sketch: reads the IMU, runs the filter and dead reckoning, prints CSV over serial |
-| `tools/plot_any.py` | Python script that plots the logged path with matplotlib |
+| `mpureadings/mpureadings.ino` | Arduino sketch that reads the IMU, runs the filter and dead-reckoning calculations, and sends CSV data over serial |
+| `tools/plot_any.py` | Python script that plots the recorded path using matplotlib |
 
-## How to run
+## How to Run
 
-1. Open `mpureadings/mpureadings.ino` in Arduino IDE and upload it at 115200 baud.
-2. Keep the board **flat and completely still** for the 5-second calibration.
+1. Open `mpureadings/mpureadings.ino` in the Arduino IDE and upload it at **115200 baud**.
+2. During the 5-second calibration, keep the board **flat and completely still**.
 3. Move the unit along your test path.
-4. Serial commands: `r` zeroes position and heading, `c` recalibrates.
+4. Serial commands:
+   - `r` — resets position and heading to zero
+   - `c` — runs calibration again
 
 Serial output (10 Hz):
 
-```
+```text
 ms,x,y,yaw_deg,zupt,roll_deg,pitch_deg
 ```
 
-### Plotting
+### Plotting the Path
 
-Save the serial output to a text file (for example `log.txt`), then:
+Save the serial output to a text file (for example, `log.txt`), then run:
 
-```
+```bash
 pip install matplotlib
 python tools/plot_any.py log.txt
 ```
 
-This saves `log_plot.png` and prints the sample count, total path length and start-to-end distance. The `ROTATE90` flag at the top of the script rotates the plot by 90 degrees to match the axis convention of the sketch version used for the logs.
+The script saves `log_plot.png` and displays the sample count, total path length, and start-to-end distance. The `ROTATE90` flag near the top of the script rotates the plot by 90 degrees to match the axis convention used by the sketch version that generated the logs.
 
 ## Results
 
-*Add after the walk test.*
+*Add results after completing the walk test.*
 
 | Test | Real path | Tracked end-point error | Notes |
 |---|---|---|---|
 | Square, 2 m sides | | | |
 
-Add your plot images to an `images/` folder and link them here.
+Place plot images in an `images/` folder and link them here.
